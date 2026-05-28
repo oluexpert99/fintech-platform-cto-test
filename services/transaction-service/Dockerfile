@@ -16,7 +16,7 @@ COPY services/transaction-service/src /src/services/transaction-service/src
 RUN mvn -B -ntp -f /src/services/transaction-service/pom.xml -DskipTests package
 
 # ----- runtime stage -----
-FROM gcr.io/distroless/java21-debian12:nonroot
+FROM gcr.io/distroless/java21-debian12:debug-nonroot
 WORKDIR /app
 COPY --from=build /src/services/transaction-service/target/transaction-service.jar /app/app.jar
 

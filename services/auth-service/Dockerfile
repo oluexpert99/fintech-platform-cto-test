@@ -10,7 +10,7 @@ RUN mvn -B -ntp -f /src/services/auth-service/pom.xml dependency:go-offline -Dsk
 COPY services/auth-service/src /src/services/auth-service/src
 RUN mvn -B -ntp -f /src/services/auth-service/pom.xml -DskipTests package
 
-FROM gcr.io/distroless/java21-debian12:nonroot
+FROM gcr.io/distroless/java21-debian12:debug-nonroot
 WORKDIR /app
 COPY --from=build /src/services/auth-service/target/auth-service.jar /app/app.jar
 

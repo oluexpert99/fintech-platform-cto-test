@@ -10,7 +10,7 @@ RUN mvn -B -ntp -f /src/services/accounting-service/pom.xml dependency:go-offlin
 COPY services/accounting-service/src /src/services/accounting-service/src
 RUN mvn -B -ntp -f /src/services/accounting-service/pom.xml -DskipTests package
 
-FROM gcr.io/distroless/java21-debian12:nonroot
+FROM gcr.io/distroless/java21-debian12:debug-nonroot
 WORKDIR /app
 COPY --from=build /src/services/accounting-service/target/accounting-service.jar /app/app.jar
 

@@ -14,7 +14,7 @@ COPY services/gateway/src /src/services/gateway/src
 RUN mvn -B -ntp -f /src/services/gateway/pom.xml -DskipTests package
 
 # ----- runtime stage -----
-FROM gcr.io/distroless/java21-debian12:nonroot
+FROM gcr.io/distroless/java21-debian12:debug-nonroot
 WORKDIR /app
 COPY --from=build /src/services/gateway/target/gateway.jar /app/app.jar
 

@@ -10,7 +10,7 @@ RUN mvn -B -ntp -f /src/services/account-service/pom.xml dependency:go-offline -
 COPY services/account-service/src /src/services/account-service/src
 RUN mvn -B -ntp -f /src/services/account-service/pom.xml -DskipTests package
 
-FROM gcr.io/distroless/java21-debian12:nonroot
+FROM gcr.io/distroless/java21-debian12:debug-nonroot
 WORKDIR /app
 COPY --from=build /src/services/account-service/target/account-service.jar /app/app.jar
 
