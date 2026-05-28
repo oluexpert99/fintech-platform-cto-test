@@ -1,0 +1,55 @@
+spring:
+  application:
+    name: accounting-service
+  data:
+    mongodb:
+      # Accounting owns its own database. No read access to the `fintech` DB —
+      # the projection lives here, fed by Kafka events from the transaction service.
+      uri: ${MONGO_URI:mongodb://localhost:27017/fintech_accounting}
+      auto-index-creation: false
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    consumer:
+      group-id: accounting
+      enable-auto-commit: false
+      auto-offset-reset: earliest
+      isolation-level: read_committed
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8090/realms/fintech}
+
+server:
+  port: ${SERVER_PORT:8080}
+
+management:
+  server:
+    port: ${MANAGEMENT_PORT:8081}
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus,info
+  metrics:
+    tags:
+      service: accounting-service
+
+reports:
+  cache:
+    trial-balance-summary-ttl-seconds: 60
+
+reconciliation:
+  # Hourly reconciliation per ARCHITECTURE.md §10.1. In dev we run more frequently for visibility.
+  initial-delay-seconds: 60
+  period-seconds: 3600
+
+logging:
+  level:
+    root: INFO
+    com.example.fintech: DEBUG
+  pattern:
+    console: '{"timestamp":"%d{yyyy-MM-dd''T''HH:mm:ss.SSSXXX}","level":"%p","service":"${spring.application.name}","correlationId":"%X{correlationId:-}","logger":"%logger","message":"%msg"}%n'

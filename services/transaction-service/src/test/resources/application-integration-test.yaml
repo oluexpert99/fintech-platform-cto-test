@@ -1,0 +1,27 @@
+spring:
+  data:
+    mongodb:
+      # uri is set dynamically by IntegrationTestBase via @DynamicPropertySource
+      auto-index-creation: false
+  kafka:
+    # bootstrap-servers set dynamically
+    consumer:
+      auto-offset-reset: earliest
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: '*'
+
+outbox:
+  publisher:
+    tick-millis: 100                  # faster ticks in tests
+    batch-size: 10
+    max-attempts: 3
+
+logging:
+  level:
+    root: WARN
+    com.example.fintech: INFO
+    org.testcontainers: INFO

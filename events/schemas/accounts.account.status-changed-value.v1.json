@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id":     "https://api.example.com/schemas/accounts.account.status-changed-value.v1.json",
+  "title":   "AccountStatusChangedEvent v1",
+  "allOf":   [{ "$ref": "_envelope.v1.json" }],
+  "properties": {
+    "eventType":    { "const": "AccountStatusChangedEvent" },
+    "eventVersion": { "const": 1 },
+    "data": {
+      "type": "object",
+      "required": ["accountId", "previousStatus", "newStatus", "reason", "changedAt"],
+      "additionalProperties": false,
+      "properties": {
+        "accountId":      { "type": "string", "pattern": "^ACC[0-9]{6,}$" },
+        "previousStatus": { "type": "string", "enum": ["ACTIVE","FROZEN","CLOSED"] },
+        "newStatus":      { "type": "string", "enum": ["ACTIVE","FROZEN","CLOSED"] },
+        "reason":         {
+          "type": "string",
+          "enum": ["USER_REQUESTED","USER_REQUEST_CLEARED","KYC_PENDING","FRAUD_SUSPECTED","COMPLIANCE_HOLD","CUSTOMER_CLOSED"]
+        },
+        "operatorId":     { "type": ["string", "null"] },
+        "changedAt":      { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: transaction-service
+description: FinTech Transaction Service — money movement, double-entry journal, outbox publisher
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

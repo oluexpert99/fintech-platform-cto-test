@@ -1,0 +1,20 @@
+# Dev overrides — single replica, generous probes, no HPA.
+replicaCount: 1
+
+image:
+  tag: main
+
+resources:
+  requests: { cpu: 100m, memory: 512Mi }
+  limits:   { cpu: 1,    memory: 1Gi }
+
+autoscaling:
+  enabled: false
+
+podDisruptionBudget:
+  enabled: false
+
+env:
+  MONGO_URI: "mongodb://mongo1.dev:27017,mongo2.dev:27017,mongo3.dev:27017/fintech?replicaSet=rs0"
+  KAFKA_BOOTSTRAP: "kafka.dev:9092"
+  KEYCLOAK_ISSUER_URI: "https://keycloak.dev.example.com/realms/fintech"

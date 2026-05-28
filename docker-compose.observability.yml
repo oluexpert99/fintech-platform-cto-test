@@ -1,0 +1,68 @@
+# Observability overlay. Run with:
+#   docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d
+#
+# Adds Prometheus (metrics), Grafana (dashboards), Loki (logs), Promtail (log shipper),
+# OTel collector (traces). Service URLs:
+#   Grafana    http://localhost:3000   admin/admin
+#   Prometheus http://localhost:9090
+#   Loki       http://localhost:3100
+
+services:
+
+  prometheus:
+    image: prom/prometheus:v2.55.0
+    container_name: fintech-prometheus
+    ports: ["9090:9090"]
+    volumes:
+      - ./infra/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks: [fintech-net]
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: fintech-grafana
+    ports: ["3000:3000"]
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./infra/observability/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
+      - ./infra/observability/grafana-dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml:ro
+    networks: [fintech-net]
+    depends_on: [prometheus, loki]
+    restart: unless-stopped
+
+  loki:
+    image: grafana/loki:3.1.0
+    container_name: fintech-loki
+    ports: ["3100:3100"]
+    volumes:
+      - ./infra/observability/loki-config.yaml:/etc/loki/local-config.yaml:ro
+    command: -config.file=/etc/loki/local-config.yaml
+    networks: [fintech-net]
+    restart: unless-stopped
+
+  promtail:
+    image: grafana/promtail:3.1.0
+    container_name: fintech-promtail
+    volumes:
+      - ./infra/observability/promtail-config.yaml:/etc/promtail/config.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: -config.file=/etc/promtail/config.yaml
+    networks: [fintech-net]
+    depends_on: [loki]
+    restart: unless-stopped
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.108.0
+    container_name: fintech-otel
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+      - "8889:8889"   # Prometheus metrics export
+    volumes:
+      - ./infra/observability/otel-collector.yaml:/etc/otel-collector-config.yaml:ro
+    command: ["--config", "/etc/otel-collector-config.yaml"]
+    networks: [fintech-net]
+    restart: unless-stopped

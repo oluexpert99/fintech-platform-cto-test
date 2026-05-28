@@ -1,0 +1,31 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: fintech-dev
+
+scrape_configs:
+  - job_name: gateway
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['gateway:8081']
+
+  - job_name: auth-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['auth-service:8081']
+
+  - job_name: account-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['account-service:8081']
+
+  - job_name: transaction-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['transaction-service:8081']
+
+  - job_name: accounting-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['accounting-service:8081']

@@ -1,0 +1,58 @@
+image:
+  repository: ghcr.io/example/fintech/transaction-service
+  tag: ""           # set per environment; defaults to .Chart.AppVersion
+  pullPolicy: IfNotPresent
+
+replicaCount: 3
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: 2000m
+    memory: 2Gi
+
+service:
+  type: ClusterIP
+  port: 8080
+  managementPort: 8081
+
+env:
+  MONGO_URI: "mongodb://mongo-rs/fintech?replicaSet=rs0"
+  KAFKA_BOOTSTRAP: "kafka:9092"
+  KEYCLOAK_ISSUER_URI: "http://keycloak/realms/fintech"
+  MANAGEMENT_PORT: "8081"
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 60
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+
+probes:
+  readiness:
+    path: /actuator/health/readiness
+    initialDelaySeconds: 20
+    periodSeconds: 10
+  liveness:
+    path: /actuator/health/liveness
+    initialDelaySeconds: 60
+    periodSeconds: 30
+
+serviceMonitor:
+  enabled: true
+  interval: 15s
+  path: /actuator/prometheus
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["ALL"]

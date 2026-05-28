@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id":     "https://api.example.com/schemas/transactions.transfer.completed-value.v1.json",
+  "title":   "TransactionCompletedEvent v1",
+  "allOf":   [{ "$ref": "_envelope.v1.json" }],
+  "properties": {
+    "eventType":    { "const": "TransactionCompletedEvent" },
+    "eventVersion": { "const": 1 },
+    "data": {
+      "type": "object",
+      "required": ["transactionId", "type", "sourceAccount", "destinationAccount", "amount", "currency", "completedAt"],
+      "additionalProperties": false,
+      "properties": {
+        "transactionId":      { "type": "string", "pattern": "^TX-[0-9A-HJKMNP-TV-Z]{26}$" },
+        "type":               { "const": "TRANSFER" },
+        "sourceAccount":      { "type": "string", "pattern": "^ACC[0-9]{6,}$" },
+        "destinationAccount": { "type": "string", "pattern": "^ACC[0-9]{6,}$" },
+        "amount":             { "type": "integer", "minimum": 1 },
+        "currency":           { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "description":        { "type": ["string", "null"], "maxLength": 140 },
+        "completedAt":        { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

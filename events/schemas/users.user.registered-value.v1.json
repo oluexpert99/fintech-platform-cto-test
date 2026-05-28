@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id":     "https://api.example.com/schemas/users.user.registered-value.v1.json",
+  "title":   "UserRegisteredEvent v1",
+  "allOf":   [{ "$ref": "_envelope.v1.json" }],
+  "properties": {
+    "eventType":    { "const": "UserRegisteredEvent" },
+    "eventVersion": { "const": 1 },
+    "data": {
+      "type": "object",
+      "required": ["userId", "registeredAt"],
+      "additionalProperties": false,
+      "properties": {
+        "userId":       { "type": "string", "pattern": "^U-[0-9A-HJKMNP-TV-Z]{26}$" },
+        "registeredAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

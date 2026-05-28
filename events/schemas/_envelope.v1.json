@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id":     "https://api.example.com/schemas/_envelope.v1.json",
+  "title":   "EventEnvelope v1",
+  "description": "Shared outer envelope wrapping every event on every topic. The payload-specific shape lives in `data` and is governed by per-event schemas.",
+  "type":    "object",
+  "required": ["eventId", "eventType", "eventVersion", "occurredAt", "producedAt", "producer", "correlationId", "data"],
+  "additionalProperties": false,
+  "properties": {
+    "eventId":       { "type": "string", "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$", "description": "ULID; globally unique; consumer dedupe key." },
+    "eventType":     { "type": "string", "pattern": "^[A-Z][A-Za-z0-9]+Event$" },
+    "eventVersion":  { "type": "integer", "minimum": 1 },
+    "occurredAt":    { "type": "string", "format": "date-time" },
+    "producedAt":    { "type": "string", "format": "date-time" },
+    "producer":      { "type": "string", "pattern": "^[a-z-]+@[0-9]+\\.[0-9]+\\.[0-9]+(-[A-Za-z0-9]+)?$" },
+    "correlationId": { "type": "string" },
+    "causationId":   { "type": ["string", "null"] },
+    "traceparent":   { "type": ["string", "null"] },
+    "data":          { "type": "object" }
+  }
+}

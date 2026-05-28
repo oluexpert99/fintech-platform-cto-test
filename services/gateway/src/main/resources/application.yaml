@@ -1,0 +1,94 @@
+spring:
+  application:
+    name: gateway
+  cloud:
+    gateway:
+      server:
+        webflux:
+          # Forward + rewrite headers for downstream services
+          default-filters:
+            - PreserveHostHeader
+          routes:
+            # Auth Service — users, sessions, MFA, OAuth2 token endpoint
+            - id: auth-users
+              uri: ${AUTH_SERVICE_URL:http://auth-service:8080}
+              predicates:
+                - Path=/v1/users,/v1/users/**
+            - id: auth-sessions
+              uri: ${AUTH_SERVICE_URL:http://auth-service:8080}
+              predicates:
+                - Path=/v1/sessions,/v1/sessions/**
+            - id: auth-oauth
+              uri: ${AUTH_SERVICE_URL:http://auth-service:8080}
+              predicates:
+                - Path=/v1/oauth/**
+
+            # Account Service
+            - id: accounts
+              uri: ${ACCOUNT_SERVICE_URL:http://account-service:8080}
+              predicates:
+                - Path=/v1/accounts,/v1/accounts/**
+
+            # Transaction Service
+            - id: transactions
+              uri: ${TRANSACTION_SERVICE_URL:http://transaction-service:8080}
+              predicates:
+                - Path=/v1/transactions,/v1/transactions/**
+
+            # Accounting Service — journal, reports, chart of accounts
+            - id: journal-entries
+              uri: ${ACCOUNTING_SERVICE_URL:http://accounting-service:8080}
+              predicates:
+                - Path=/v1/journal-entries,/v1/journal-entries/**
+            - id: reports
+              uri: ${ACCOUNTING_SERVICE_URL:http://accounting-service:8080}
+              predicates:
+                - Path=/v1/reports/**
+            - id: chart-of-accounts
+              uri: ${ACCOUNTING_SERVICE_URL:http://accounting-service:8080}
+              predicates:
+                - Path=/v1/chart-of-accounts,/v1/chart-of-accounts/**
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://keycloak:8080/realms/fintech}
+
+  data:
+    redis:
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}
+
+ratelimit:
+  defaults:
+    anon:                     { capacity: 60,   refill-per-second: 1 }
+    user-transactions-write:  { capacity: 60,   refill-per-second: 1 }
+    user-sessions-post:       { capacity: 10,   refill-per-second: 0.17 }
+    user-default:             { capacity: 6000, refill-per-second: 100 }
+
+server:
+  port: ${SERVER_PORT:8080}
+
+management:
+  server:
+    port: ${MANAGEMENT_PORT:8081}
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus,info
+  metrics:
+    tags:
+      service: gateway
+
+logging:
+  level:
+    root: INFO
+    org.springframework.cloud.gateway: INFO
+    org.springframework.security: WARN
+  pattern:
+    console: '{"timestamp":"%d{yyyy-MM-dd''T''HH:mm:ss.SSSXXX}","level":"%p","service":"${spring.application.name}","correlationId":"%X{correlationId:-}","logger":"%logger","message":"%msg"}%n'

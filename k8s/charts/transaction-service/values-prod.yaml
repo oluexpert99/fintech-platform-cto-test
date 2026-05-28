@@ -1,0 +1,27 @@
+# Production overrides — high replica count, strict probes, full HPA + PDB.
+
+# image.tag MUST be set by CD to the signed :v<semver> tag — never :main or :latest.
+
+replicaCount: 6
+
+resources:
+  requests: { cpu: 1, memory: 2Gi }
+  limits:   { cpu: 4, memory: 4Gi }
+
+autoscaling:
+  enabled: true
+  minReplicas: 6
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 60
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 4
+
+env:
+  MONGO_URI: "mongodb+srv://fintech-prod.mongodb.net/fintech?retryWrites=true&w=majority"
+  KAFKA_BOOTSTRAP: "b-1.fintech-prod.msk.amazonaws.com:9094,b-2.fintech-prod.msk.amazonaws.com:9094"
+  KEYCLOAK_ISSUER_URI: "https://id.example.com/realms/fintech"
+
+# Secrets (MONGO password, Keycloak admin secret, etc.) are mounted from the Vault CSI driver,
+# not declared here. See helmfile or argocd application config for the secret references.

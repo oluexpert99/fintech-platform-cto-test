@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id":     "https://api.example.com/schemas/transactions.transfer.reversed-value.v1.json",
+  "title":   "TransactionReversedEvent v1",
+  "allOf":   [{ "$ref": "_envelope.v1.json" }],
+  "properties": {
+    "eventType":    { "const": "TransactionReversedEvent" },
+    "eventVersion": { "const": 1 },
+    "data": {
+      "type": "object",
+      "required": ["transactionId", "type", "correctsTransactionId", "sourceAccount", "destinationAccount", "amount", "currency", "completedAt", "reason"],
+      "additionalProperties": false,
+      "properties": {
+        "transactionId":         { "type": "string", "pattern": "^TX-[0-9A-HJKMNP-TV-Z]{26}$" },
+        "type":                  { "const": "REVERSAL" },
+        "correctsTransactionId": { "type": "string", "pattern": "^TX-[0-9A-HJKMNP-TV-Z]{26}$" },
+        "sourceAccount":         { "type": "string" },
+        "destinationAccount":    { "type": "string" },
+        "amount":                { "type": "integer", "minimum": 1 },
+        "currency":              { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "completedAt":           { "type": "string", "format": "date-time" },
+        "reason":                { "type": "string", "maxLength": 500 }
+      }
+    }
+  }
+}

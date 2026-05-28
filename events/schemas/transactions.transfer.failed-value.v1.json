@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id":     "https://api.example.com/schemas/transactions.transfer.failed-value.v1.json",
+  "title":   "TransactionFailedEvent v1",
+  "allOf":   [{ "$ref": "_envelope.v1.json" }],
+  "properties": {
+    "eventType":    { "const": "TransactionFailedEvent" },
+    "eventVersion": { "const": 1 },
+    "data": {
+      "type": "object",
+      "required": ["transactionId", "type", "sourceAccount", "destinationAccount", "amount", "currency", "failedAt", "reasonCode"],
+      "additionalProperties": false,
+      "properties": {
+        "transactionId":      { "type": "string", "pattern": "^TX-[0-9A-HJKMNP-TV-Z]{26}$" },
+        "type":               { "const": "TRANSFER" },
+        "sourceAccount":      { "type": "string" },
+        "destinationAccount": { "type": "string" },
+        "amount":             { "type": "integer", "minimum": 1 },
+        "currency":           { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "failedAt":           { "type": "string", "format": "date-time" },
+        "reasonCode":         {
+          "type": "string",
+          "enum": ["INSUFFICIENT_FUNDS","ACCOUNT_UNAVAILABLE","CURRENCY_MISMATCH","LIMIT_EXCEEDED","INTERNAL_ERROR"]
+        }
+      }
+    }
+  }
+}

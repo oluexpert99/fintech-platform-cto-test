@@ -1,0 +1,32 @@
+spring:
+  application:
+    name: account-service
+  data:
+    mongodb:
+      uri: ${MONGO_URI:mongodb://localhost:27017/fintech}
+      auto-index-creation: false
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8090/realms/fintech}
+
+server:
+  port: ${SERVER_PORT:8080}
+
+management:
+  server:
+    port: ${MANAGEMENT_PORT:8081}
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus,info
+
+outbox:
+  publisher:
+    tick-millis: 300
+    batch-size: 50
+    lease-duration-seconds: 5
+    max-attempts: 10

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id":     "https://api.example.com/schemas/accounts.account.opened-value.v1.json",
+  "title":   "AccountOpenedEvent v1",
+  "allOf":   [{ "$ref": "_envelope.v1.json" }],
+  "properties": {
+    "eventType":    { "const": "AccountOpenedEvent" },
+    "eventVersion": { "const": 1 },
+    "data": {
+      "type": "object",
+      "required": ["accountId", "ownerUserId", "currency", "accountType", "openedAt"],
+      "additionalProperties": false,
+      "properties": {
+        "accountId":   { "type": "string", "pattern": "^ACC[0-9]{6,}$" },
+        "ownerUserId": { "type": "string", "pattern": "^U-[0-9A-HJKMNP-TV-Z]{26}$" },
+        "currency":    { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "accountType": { "type": "string", "enum": ["CHECKING","SAVINGS"] },
+        "openedAt":    { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

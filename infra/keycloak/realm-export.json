@@ -1,0 +1,165 @@
+{
+  "realm": "fintech",
+  "displayName": "FinTech Platform",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "maxFailureWaitSeconds": 900,
+  "minimumQuickLoginWaitSeconds": 60,
+  "waitIncrementSeconds": 60,
+  "quickLoginCheckMilliSeconds": 1000,
+  "maxDeltaTimeSeconds": 43200,
+  "failureFactor": 5,
+
+  "accessTokenLifespan": 900,
+  "ssoSessionIdleTimeout": 3600,
+  "ssoSessionMaxLifespan": 86400,
+  "offlineSessionIdleTimeout": 0,
+  "offlineSessionMaxLifespan": 0,
+
+  "passwordPolicy": "length(12) and notUsername and notEmail and digits(1) and specialChars(1)",
+
+  "roles": {
+    "realm": [
+      { "name": "user",     "description": "Standard customer role" },
+      { "name": "operator", "description": "Platform operator; gates account freezing, reversals, dual control" },
+      { "name": "auditor",  "description": "Read-only access to ledger + reports" }
+    ]
+  },
+
+  "defaultRoles": ["user", "offline_access", "uma_authorization"],
+
+  "scopeMappings": [
+    { "client": "web-app",      "roles": ["user"] },
+    { "client": "mobile-app",   "roles": ["user"] },
+    { "client": "auth-service", "roles": ["user", "operator", "auditor"] }
+  ],
+
+  "clientScopes": [
+    {
+      "name": "accounts:read",
+      "protocol": "openid-connect",
+      "description": "Read own accounts and balances"
+    },
+    {
+      "name": "accounts:write",
+      "protocol": "openid-connect",
+      "description": "Open, label, freeze own accounts"
+    },
+    {
+      "name": "transactions:read",
+      "protocol": "openid-connect",
+      "description": "Read own transactions"
+    },
+    {
+      "name": "transactions:write",
+      "protocol": "openid-connect",
+      "description": "Create TRANSFER transactions on own accounts"
+    },
+    {
+      "name": "transactions:reverse",
+      "protocol": "openid-connect",
+      "description": "Operator scope; create REVERSAL transactions"
+    },
+    {
+      "name": "admin:*",
+      "protocol": "openid-connect",
+      "description": "Operator / auditor scope"
+    }
+  ],
+
+  "defaultDefaultClientScopes": [
+    "accounts:read", "transactions:read"
+  ],
+
+  "defaultOptionalClientScopes": [
+    "accounts:write", "transactions:write", "transactions:reverse", "admin:*"
+  ],
+
+  "clients": [
+    {
+      "clientId": "web-app",
+      "name": "FinTech Web App",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["http://localhost:3000/*", "https://app.example.com/*"],
+      "webOrigins": ["http://localhost:3000", "https://app.example.com"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      }
+    },
+    {
+      "clientId": "mobile-app",
+      "name": "FinTech Mobile App",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["com.example.fintech://oauth/callback"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      }
+    },
+    {
+      "clientId": "auth-service",
+      "name": "Auth Service (server-side adapter)",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "dev-only-secret-not-for-prod",
+      "serviceAccountsEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "standardFlowEnabled": false,
+      "attributes": {
+        "access.token.lifespan": "900"
+      }
+    },
+    {
+      "clientId": "gateway",
+      "name": "API Gateway (resource server)",
+      "enabled": true,
+      "bearerOnly": true
+    }
+  ],
+
+  "users": [
+    {
+      "username": "alice",
+      "email": "alice@example.com",
+      "firstName": "Alice",
+      "lastName": "Liddell",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "AliceP@ssw0rd!", "temporary": false }],
+      "realmRoles": ["user"],
+      "attributes": { "phone": ["+447700900001"] }
+    },
+    {
+      "username": "operator1",
+      "email": "operator1@example.com",
+      "firstName": "Olivia",
+      "lastName": "Operator",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "OperatorP@ss1!", "temporary": false }],
+      "realmRoles": ["user", "operator"]
+    },
+    {
+      "username": "auditor1",
+      "email": "auditor1@example.com",
+      "firstName": "Audrey",
+      "lastName": "Auditor",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "AuditorP@ss1!", "temporary": false }],
+      "realmRoles": ["user", "auditor"]
+    }
+  ]
+}
