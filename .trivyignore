@@ -1,0 +1,18 @@
+# Trivy ignore list — see https://trivy.dev/docs/configuration/filtering/
+#
+# Each entry MUST include a justification and an owner/review date so the
+# ignore list stays honest. Removing an entry is the goal, not adding to it.
+
+# ---------------------------------------------------------------------------
+# CVE-2026-41254 — liblcms2-2 (Little CMS) in distroless/java21-debian12 base
+#
+# Source: Google distroless base image (gcr.io/distroless/java21-debian12:nonroot)
+# Fix:    Debian 12 backport 2.14-2+deb12u1 — already in debian-security but
+#         the distroless image has not yet been rebuilt to pick it up.
+# Risk:   The Little CMS library is not exercised by the JVM workload in any
+#         of our services (no image / colour-profile processing in transaction,
+#         account, accounting, auth or gateway). Information-disclosure and DoS
+#         vectors require an attacker-controlled colour profile to reach lcms2,
+#         which has no code path in this platform.
+# Action: Re-evaluate when distroless rebuild lands; remove this entry then.
+CVE-2026-41254
