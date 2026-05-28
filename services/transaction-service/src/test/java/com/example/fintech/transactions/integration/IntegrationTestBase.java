@@ -37,7 +37,11 @@ public abstract class IntegrationTestBase {
     @ServiceConnection
     protected static final MongoDBContainer MONGO = new MongoDBContainer(DockerImageName.parse("mongo:7.0.14"));
 
-    @ServiceConnection
+    // Note: Kafka is NOT wired via @ServiceConnection. Spring Boot 4's
+    // KafkaContainerConnectionDetailsFactory only matches the newer
+    // org.testcontainers.kafka.{KafkaContainer,ConfluentKafkaContainer} classes,
+    // not the deprecated org.testcontainers.containers.KafkaContainer. We bind
+    // spring.kafka.bootstrap-servers via @DynamicPropertySource below.
     protected static final KafkaContainer KAFKA = new KafkaContainer(
             DockerImageName.parse("confluentinc/cp-kafka:7.7.1"));
 
@@ -48,7 +52,8 @@ public abstract class IntegrationTestBase {
 
     @DynamicPropertySource
     static void registerProperties(DynamicPropertyRegistry registry) {
-        // Mongo + Kafka wired via @ServiceConnection above.
+        // Mongo via @ServiceConnection. Kafka bootstrap-servers below (see comment above).
+        registry.add("spring.kafka.bootstrap-servers", KAFKA::getBootstrapServers);
         // Disable JWT validation for tests that don't need it. Tests requiring real Keycloak
         // start their own container and override these properties.
         registry.add("spring.security.oauth2.resourceserver.jwt.issuer-uri", () -> "http://disabled-for-tests");
