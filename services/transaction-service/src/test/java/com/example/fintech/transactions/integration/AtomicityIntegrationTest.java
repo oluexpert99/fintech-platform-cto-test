@@ -177,7 +177,8 @@ class AtomicityIntegrationTest extends IntegrationTestBase {
         doc.setStatus(status);
         doc.setCreatedAt(Instant.now());
         doc.setUpdatedAt(Instant.now());
-        doc.setVersion(0L);
+        // Leave @Version field null so MongoRepository.save() takes the insert path.
+        // Setting it to 0L triggers the versioned-update branch, which fails on a fresh DB.
         accountRepository.save(doc);
     }
 

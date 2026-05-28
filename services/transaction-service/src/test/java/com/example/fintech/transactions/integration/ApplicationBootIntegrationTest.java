@@ -9,9 +9,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Smoke test: the Spring context boots end-to-end against real Mongo + Kafka via Testcontainers.
  *
- * <p>This proves the toolchain — POM, configs, Mongock migrations, repository wiring, security
- * config — is structurally correct before any business logic is implemented. The §5.2 scenarios
- * from {@code transaction-service.spec} land in follow-up commits as the transfer flow is wired.
+ * <p>This proves the toolchain — POM, configs, SchemaInitializer wiring, repository wiring,
+ * security config — is structurally correct.
  */
 class ApplicationBootIntegrationTest extends IntegrationTestBase {
 
@@ -21,7 +20,8 @@ class ApplicationBootIntegrationTest extends IntegrationTestBase {
     @Test
     void springContextLoads() {
         assertThat(context).isNotNull();
-        assertThat(context.containsBean("transferService")).isTrue();
+        // TransferService + ReversalService were merged into TransactionWriteService (CQRS shape).
+        assertThat(context.containsBean("transactionWriteService")).isTrue();
         assertThat(context.containsBean("outboxPublisher")).isTrue();
     }
 }
