@@ -6,9 +6,16 @@ import { AuthPage } from './features/auth/pages/AuthPage'
 import { HomePage } from './features/home/pages/HomePage'
 import { TransactionsPage } from './features/transactions/pages/TransactionsPage'
 import { RequireAuth } from './shared/auth/RequireAuth'
+import { RequireRole } from './shared/auth/RequireRole'
+import { useHasAnyRole } from './shared/auth/useAuth'
 import { UserMenu } from './shared/ui/UserMenu'
 
+// Roles that may use the accounting / audit module (mirrors the backend @PreAuthorize gates).
+const ACCOUNTING_ROLES = ['auditor', 'operator']
+
 export default function App() {
+  const canAccounting = useHasAnyRole(...ACCOUNTING_ROLES)
+
   return (
     <div className="layout">
       <header className="topbar">
@@ -23,7 +30,13 @@ export default function App() {
         <NavLink to="/" end>Home</NavLink>
         <NavLink to="/accounts">Accounts</NavLink>
         <NavLink to="/transactions">Transactions</NavLink>
-        <NavLink to="/accounting">Accounting</NavLink>
+        {/* Visible to all (it's a test console), but flagged when the user lacks the role. */}
+        <NavLink
+          to="/accounting"
+          title={canAccounting ? undefined : 'Requires the auditor or operator role'}
+        >
+          Accounting{canAccounting ? '' : ' 🔒'}
+        </NavLink>
         <NavLink to="/admin" className="nav__admin">Admin</NavLink>
       </nav>
 
@@ -41,7 +54,7 @@ export default function App() {
           />
           <Route
             path="/accounting"
-            element={<RequireAuth><AccountingPage /></RequireAuth>}
+            element={<RequireRole anyOf={ACCOUNTING_ROLES}><AccountingPage /></RequireRole>}
           />
           <Route path="/admin" element={<AdminPage />} />
         </Routes>

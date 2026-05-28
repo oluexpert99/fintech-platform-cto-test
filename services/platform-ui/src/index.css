@@ -92,6 +92,17 @@ body {
   white-space: nowrap;
 }
 
+.user-menu__roles {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  white-space: nowrap;
+}
+
 /* Nav */
 .nav {
   display: flex;

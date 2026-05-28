@@ -2,11 +2,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { logoutCurrent, me } from "../../features/auth/api/authApi";
 import { clearTokens } from "../auth/tokenStore";
-import { useIsAuthenticated } from "../auth/useAuth";
+import { useIsAuthenticated, useRoles } from "../auth/useAuth";
 import { useToast } from "./Toast";
 
 export function UserMenu() {
   const authed = useIsAuthenticated();
+  const roles = useRoles();
   const queryClient = useQueryClient();
   const { show } = useToast();
 
@@ -33,6 +34,11 @@ export function UserMenu() {
   return (
     <div className="user-menu">
       <span className="user-menu__email">{meQuery.data?.email ?? "signed in"}</span>
+      {roles.length > 0 && (
+        <span className="user-menu__roles" title="Your realm roles">
+          {roles.join(" · ")}
+        </span>
+      )}
       <button
         type="button"
         className="btn btn--ghost btn--sm"
