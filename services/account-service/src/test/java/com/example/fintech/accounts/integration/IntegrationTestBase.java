@@ -7,25 +7,37 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.KafkaContainer;
 import org.testcontainers.containers.MongoDBContainer;
-import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
+/**
+ * Base for every integration test in this module.
+ *
+ * <p>Containers are started via a static initializer (NOT {@code @Container}) so they're
+ * JVM-scoped, not test-class-scoped — the JUnit Testcontainers extension's per-class
+ * start/stop loop would otherwise churn the underlying containers between subclasses while
+ * Spring's cached ApplicationContext kept pointing to the original mapped ports. Ryuk handles
+ * cleanup at JVM exit.
+ */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("integration-test")
 @Testcontainers(disabledWithoutDocker = true)
 public abstract class IntegrationTestBase {
 
-    @Container
     @ServiceConnection
     protected static final MongoDBContainer MONGO = new MongoDBContainer(DockerImageName.parse("mongo:7.0.14"));
+
     // Note: Kafka is NOT wired via @ServiceConnection. Spring Boot 4's
     // KafkaContainerConnectionDetailsFactory only matches the newer
     // org.testcontainers.kafka.{KafkaContainer,ConfluentKafkaContainer} classes,
     // not the deprecated org.testcontainers.containers.KafkaContainer. We bind
     // spring.kafka.bootstrap-servers via @DynamicPropertySource below.
-    @Container
     protected static final KafkaContainer KAFKA = new KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.7.1"));
+
+    static {
+        MONGO.start();
+        KAFKA.start();
+    }
 
     @DynamicPropertySource
     static void registerProperties(DynamicPropertyRegistry registry) {

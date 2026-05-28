@@ -35,8 +35,11 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 class AccountsApiIntegrationTest extends IntegrationTestBase {
 
     private MockMvc mockMvc;
-    @Autowired
-    private ObjectMapper objectMapper;
+    // Local instance, not @Autowired: the project uses Jackson 3
+    // (tools.jackson.databind.json.JsonMapper), so Spring Boot 4 doesn't autoconfigure
+    // a com.fasterxml.jackson.databind.ObjectMapper bean. This test only uses readTree()
+    // to inspect responses, so a local Jackson 2 ObjectMapper is fine.
+    private final ObjectMapper objectMapper = new ObjectMapper();
     @Autowired
     private MongoTemplate mongoTemplate;
     @Autowired
