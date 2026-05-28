@@ -4,6 +4,7 @@ import com.example.fintech.auth.domain.exception.AccountLockedException;
 import com.example.fintech.auth.domain.exception.EmailAlreadyRegisteredException;
 import com.example.fintech.auth.domain.exception.RefreshTokenRevokedException;
 import com.example.fintech.auth.domain.exception.WeakPasswordException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,8 +16,11 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
+import java.io.IOException;
 import java.time.Duration;
+import java.util.Base64;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Default {@link KeycloakAdminClient} that talks to Keycloak via {@link WebClient}.
@@ -35,12 +39,20 @@ public class KeycloakWebClient implements KeycloakAdminClient {
 
     private static final Logger log = LoggerFactory.getLogger(KeycloakWebClient.class);
     private static final Duration TIMEOUT = Duration.ofSeconds(10);
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final WebClient webClient;
     private final String realm;
     private final String adminClientId;
     private final String adminClientSecret;
     private volatile String cachedAdminToken;
+
+    /**
+     * Real Keycloak tokens minted during {@link #validateCredentials} and handed to the very next
+     * {@link #issueToken} call, keyed by the user's {@code sub}. Bounded to one entry per user: a
+     * re-login overwrites any stale entry, and {@code issueToken} removes it on read.
+     */
+    private final Map<String, TokenIssueResult> pendingTokens = new ConcurrentHashMap<>();
 
     public KeycloakWebClient(
             WebClient.Builder webClientBuilder,
@@ -56,6 +68,11 @@ public class KeycloakWebClient implements KeycloakAdminClient {
 
     @Override
     public String createUser(String email, String password, String fullName, String phone) {
+        // NOTE: `phone` is intentionally NOT stored on the Keycloak user. The realm's declarative
+        // user profile only manages username/email/firstName/lastName (unmanaged attrs disabled),
+        // so an extra `phone` attribute makes the profile "incomplete" and trips VERIFY_PROFILE at
+        // login ("Account is not fully set up"). Phone is persisted in our own Mongo user record
+        // (RegisterUserService), which is the system of record for it.
         Map<String, Object> body = Map.of(
                 "username", email,
                 "email", email,
@@ -66,8 +83,7 @@ public class KeycloakWebClient implements KeycloakAdminClient {
                 "emailVerified", true,
                 "firstName", firstName(fullName),
                 "lastName", lastName(fullName),
-                "credentials", new Object[]{Map.of("type", "password", "value", password, "temporary", false)},
-                "attributes", Map.of("phone", new String[]{phone}));
+                "credentials", new Object[]{Map.of("type", "password", "value", password, "temporary", false)});
 
         try {
             String location = webClient.post()
@@ -97,24 +113,37 @@ public class KeycloakWebClient implements KeycloakAdminClient {
 
     @Override
     public boolean validateCredentials(String email, String password) {
-        // Spec §4.2 — we use Keycloak's password grant via the realm's `auth-service` confidential client
-        // to validate credentials without keeping the resulting token. Returns true on 200, false on 401,
-        // throws AccountLockedException on 423.
+        // Spec §4.2 — resource-owner password grant via the realm's `auth-service` confidential
+        // client. The grant both validates the credentials AND yields real Keycloak tokens; we keep
+        // them (keyed by the user's sub) so the following issueToken() returns them instead of a
+        // stub. Returns true on 200, false on 401, throws AccountLockedException on 423.
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("grant_type", "password");
         form.add("client_id", adminClientId);
         form.add("client_secret", adminClientSecret);
         form.add("username", email);
         form.add("password", password);
+        // No explicit scope: the auth-service client's default scopes already grant the
+        // accounts:* / transactions:* permissions a user session needs (see realm-export.json).
         try {
-            webClient.post()
+            Map<?, ?> body = webClient.post()
                     .uri("/realms/{realm}/protocol/openid-connect/token", realm)
                     .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                     .bodyValue(form)
                     .retrieve()
-                    .toBodilessEntity()
+                    .bodyToMono(Map.class)
                     .timeout(TIMEOUT)
                     .block();
+            if (body == null) return false;
+            String accessToken = asString(body.get("access_token"));
+            TokenIssueResult tokens = new TokenIssueResult(
+                    accessToken,
+                    asString(body.get("refresh_token")),
+                    asLong(body.get("expires_in")),
+                    asLong(body.get("refresh_expires_in")),
+                    asString(body.get("scope")),
+                    asString(body.get("session_state")));
+            pendingTokens.put(subjectOf(accessToken), tokens);
             return true;
         } catch (WebClientResponseException e) {
             HttpStatusCode s = e.getStatusCode();
@@ -137,8 +166,15 @@ public class KeycloakWebClient implements KeycloakAdminClient {
 
     @Override
     public TokenIssueResult issueToken(String keycloakSub, String scope) {
-        // TODO(spec §3.3): token exchange grant; for the test we issue via password grant cached at validation time.
-        return new TokenIssueResult("dev-access-token", "dev-refresh-token", 900L, 86400L, scope, "dev-session");
+        // Return the real tokens minted by the immediately-preceding validateCredentials() call.
+        // The `scope` argument is advisory; the authoritative scope is whatever Keycloak granted.
+        TokenIssueResult tokens = pendingTokens.remove(keycloakSub);
+        if (tokens == null) {
+            throw new IllegalStateException(
+                    "No pending Keycloak token for subject " + keycloakSub
+                            + "; validateCredentials() must run immediately before issueToken()");
+        }
+        return tokens;
     }
 
     @Override
@@ -237,6 +273,19 @@ public class KeycloakWebClient implements KeycloakAdminClient {
         if (fullName == null) return "";
         int sp = fullName.lastIndexOf(' ');
         return sp < 0 ? "" : fullName.substring(sp + 1);
+    }
+
+    /** Extract the {@code sub} claim from a JWT access token without verifying its signature. */
+    private static String subjectOf(String jwt) {
+        if (jwt == null) throw new IllegalStateException("Keycloak returned no access_token");
+        String[] parts = jwt.split("\\.");
+        if (parts.length < 2) throw new IllegalStateException("Malformed JWT from Keycloak");
+        try {
+            byte[] payload = Base64.getUrlDecoder().decode(parts[1]);
+            return MAPPER.readTree(payload).path("sub").asText();
+        } catch (IllegalArgumentException | IOException e) {
+            throw new IllegalStateException("Cannot parse JWT payload from Keycloak", e);
+        }
     }
 
     private static String asString(Object o) { return o == null ? null : o.toString(); }

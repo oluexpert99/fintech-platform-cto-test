@@ -43,6 +43,28 @@
 
   "clientScopes": [
     {
+      "name": "basic",
+      "protocol": "openid-connect",
+      "description": "Baseline OIDC claims (sub, auth_time). Required so access tokens carry the subject; the realm's custom client-scope set otherwise drops it, leaving tokens with no sub — which breaks both session issuance and the resource servers' caller identity.",
+      "attributes": { "include.in.token.scope": "false", "display.on.consent.screen": "false" },
+      "protocolMappers": [
+        {
+          "name": "sub",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-sub-mapper",
+          "consentRequired": false,
+          "config": { "access.token.claim": "true", "introspection.token.claim": "true" }
+        },
+        {
+          "name": "auth_time",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usersessionmodel-note-mapper",
+          "consentRequired": false,
+          "config": { "user.session.note": "AUTH_TIME", "id.token.claim": "true", "access.token.claim": "true", "introspection.token.claim": "true", "claim.name": "auth_time", "jsonType.label": "long" }
+        }
+      ]
+    },
+    {
       "name": "roles",
       "protocol": "openid-connect",
       "description": "Standard role claims. Restores realm_access/resource_access role mappers, which the custom client-scope set above otherwise drops — required so the auth-service service account's realm-management roles reach its token.",
@@ -111,7 +133,7 @@
   ],
 
   "defaultDefaultClientScopes": [
-    "accounts:read", "transactions:read"
+    "basic", "roles", "accounts:read", "transactions:read"
   ],
 
   "defaultOptionalClientScopes": [
@@ -156,7 +178,8 @@
       "attributes": {
         "access.token.lifespan": "900"
       },
-      "defaultClientScopes": ["roles", "accounts:read", "transactions:read"]
+      "defaultClientScopes": ["basic", "roles", "accounts:read", "accounts:write", "transactions:read", "transactions:write"],
+      "optionalClientScopes": ["transactions:reverse", "offline_access", "admin:*"]
     },
     {
       "clientId": "gateway",

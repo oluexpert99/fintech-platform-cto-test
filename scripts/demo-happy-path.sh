@@ -65,7 +65,7 @@ SRC=$(curl -fs -X POST "$BASE_URL/v1/accounts" \
     -H "Authorization: Bearer $ACCESS_TOKEN" \
     -H "Content-Type: application/json" \
     -H "Idempotency-Key: $ACC_KEY_1" \
-    -d '{"currency":"USD","type":"CHECKING","label":"Source"}' | jq -r .accountId)
+    -d '{"currency":"USD","type":"CHECKING","label":"Source"}' | jq -r .id)
 green "opened source=$SRC"
 
 bold "3b. POST /v1/accounts  (destination account)"
@@ -74,7 +74,7 @@ DST=$(curl -fs -X POST "$BASE_URL/v1/accounts" \
     -H "Authorization: Bearer $ACCESS_TOKEN" \
     -H "Content-Type: application/json" \
     -H "Idempotency-Key: $ACC_KEY_2" \
-    -d '{"currency":"USD","type":"CHECKING","label":"Destination"}' | jq -r .accountId)
+    -d '{"currency":"USD","type":"CHECKING","label":"Destination"}' | jq -r .id)
 green "opened destination=$DST"
 
 # NOTE: For a real demo, the source account would need to be funded first via a top-up flow
