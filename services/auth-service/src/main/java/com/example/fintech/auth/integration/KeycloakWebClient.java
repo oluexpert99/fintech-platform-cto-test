@@ -60,6 +60,10 @@ public class KeycloakWebClient implements KeycloakAdminClient {
                 "username", email,
                 "email", email,
                 "enabled", true,
+                // Dev convenience: mark the email verified so newly-registered users can also log
+                // in through Keycloak's browser flow (account console). Email-ownership proof is
+                // out of scope for this build; the API login path (direct grant) never required it.
+                "emailVerified", true,
                 "firstName", firstName(fullName),
                 "lastName", lastName(fullName),
                 "credentials", new Object[]{Map.of("type", "password", "value", password, "temporary", false)},
