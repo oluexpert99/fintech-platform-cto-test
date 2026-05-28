@@ -66,6 +66,20 @@
         </dependencies>
     </dependencyManagement>
 
+    <dependencies>
+        <!--
+            Provides @ServiceConnection (auto-wires Testcontainers as MongoConnectionDetails /
+            KafkaConnectionDetails beans). Used by every module's integration tests; declared at
+            parent so each module inherits it without repeating the boilerplate.
+            Version managed by spring-boot-starter-parent.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-testcontainers</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
     <build>
         <pluginManagement>
             <plugins>

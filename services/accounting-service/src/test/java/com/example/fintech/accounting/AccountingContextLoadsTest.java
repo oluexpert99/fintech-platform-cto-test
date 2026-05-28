@@ -5,6 +5,7 @@ import com.example.fintech.accounting.persistence.repository.ChartOfAccountsRepo
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.ApplicationContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -28,12 +29,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AccountingContextLoadsTest {
 
     @Container
+    @ServiceConnection
     static final MongoDBContainer MONGO = new MongoDBContainer(DockerImageName.parse("mongo:7.0.14"));
 
     @DynamicPropertySource
     static void props(DynamicPropertyRegistry registry) {
-        // accounting-service now owns its own database (fintech_accounting)
-        registry.add("spring.data.mongodb.uri", () -> MONGO.getReplicaSetUrl("fintech_accounting"));
+        // Mongo wired via @ServiceConnection. In production accounting-service runs against the
+        // "fintech_accounting" database; in this test the connection-details bean uses the
+        // container's default db ("test"), which is fine — the SchemaInitializer seeds and the
+        // assertions read through the same MongoTemplate, so the db name is immaterial here.
         registry.add("spring.kafka.bootstrap-servers", () -> "localhost:9092");
         registry.add("spring.autoconfigure.exclude",
                 () -> "org.springframework.boot.autoconfigure.security.oauth2.resource.servlet.OAuth2ResourceServerAutoConfiguration,"

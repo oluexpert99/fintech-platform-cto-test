@@ -3,7 +3,7 @@ package com.example.fintech.accounts.persistence.init;
 import com.example.fintech.accounts.persistence.document.AccountDocument;
 import com.example.fintech.accounts.persistence.document.OutboxRecordDocument;
 import com.example.fintech.accounts.persistence.document.PendingApprovalDocument;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.boot.context.event.ApplicationStartedEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -18,7 +18,7 @@ public class SchemaInitializer {
         this.mongoTemplate = mongoTemplate;
     }
 
-    @EventListener(ApplicationReadyEvent.class)
+    @EventListener(ApplicationStartedEvent.class)
     public void initialise() {
         var accountIdx = mongoTemplate.indexOps(AccountDocument.class);
         accountIdx.createIndex(new Index().on("idempotencyKey", Sort.Direction.ASC).unique());

@@ -5,7 +5,7 @@ import com.example.fintech.auth.persistence.document.SessionDocument;
 import com.example.fintech.auth.persistence.document.UserDocument;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.boot.context.event.ApplicationStartedEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -24,7 +24,7 @@ public class SchemaInitializer {
         this.mongoTemplate = mongoTemplate;
     }
 
-    @EventListener(ApplicationReadyEvent.class)
+    @EventListener(ApplicationStartedEvent.class)
     public void initialise() {
         log.info("Initialising MongoDB indexes for auth-service");
         IndexOperations users = mongoTemplate.indexOps(UserDocument.class);

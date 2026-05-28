@@ -10,6 +10,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.cache.CacheManager;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -46,11 +47,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ReconciliationDriftIntegrationTest {
 
     @Container
+    @ServiceConnection
     static final MongoDBContainer MONGO = new MongoDBContainer(DockerImageName.parse("mongo:7.0.14"));
 
     @DynamicPropertySource
     static void props(DynamicPropertyRegistry registry) {
-        registry.add("spring.data.mongodb.uri", () -> MONGO.getReplicaSetUrl("fintech_accounting"));
+        // Mongo wired via @ServiceConnection above (provides MongoConnectionDetails, which
+        // sidesteps property-binding order issues with spring.data.mongodb.uri under SB4).
         registry.add("spring.kafka.bootstrap-servers", () -> "localhost:9092");
         registry.add("spring.autoconfigure.exclude",
                 () -> "org.springframework.boot.autoconfigure.security.oauth2.resource.servlet.OAuth2ResourceServerAutoConfiguration,"
