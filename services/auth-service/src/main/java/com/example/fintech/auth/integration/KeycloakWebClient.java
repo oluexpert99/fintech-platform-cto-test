@@ -46,6 +46,7 @@ public class KeycloakWebClient implements KeycloakAdminClient {
     private final String adminClientId;
     private final String adminClientSecret;
     private volatile String cachedAdminToken;
+    private volatile long adminTokenExpiresAtMs;
 
     /**
      * Real Keycloak tokens minted during {@link #validateCredentials} and handed to the very next
@@ -85,6 +86,18 @@ public class KeycloakWebClient implements KeycloakAdminClient {
                 "lastName", lastName(fullName),
                 "credentials", new Object[]{Map.of("type", "password", "value", password, "temporary", false)});
 
+        try {
+            return postCreateUser(body, email);
+        } catch (WebClientResponseException.Unauthorized e) {
+            // Cached admin token rejected (expired, or Keycloak signing keys rotated after a
+            // restart). Drop it, obtain a fresh one, and retry exactly once.
+            log.info("Keycloak admin token rejected (401); refreshing and retrying createUser");
+            invalidateAdminToken();
+            return postCreateUser(body, email);
+        }
+    }
+
+    private String postCreateUser(Map<String, Object> body, String email) {
         try {
             String location = webClient.post()
                     .uri("/admin/realms/{realm}/users", realm)
@@ -240,13 +253,24 @@ public class KeycloakWebClient implements KeycloakAdminClient {
     }
 
     /**
-     * Service-account token cache. The token is short-lived; we re-obtain on demand and don't
-     * eagerly refresh. A small race may issue two tokens for the same instance — harmless.
-     *
-     * <p>TODO(spec §6.3): proactive renewal at ~80% of token lifetime; metrics on renewals.
+     * Service-account token cache with proactive renewal. The token is refreshed once it passes
+     * ~80% of its lifetime, so we don't hand out an about-to-expire token. Callers additionally
+     * retry once on a 401 (see createUser) to cover the case where Keycloak invalidates a token
+     * early — e.g. signing keys rotated after a Keycloak restart.
      */
     private String getAdminToken() {
-        if (cachedAdminToken != null) return cachedAdminToken;
+        String cached = cachedAdminToken;
+        if (cached != null && System.currentTimeMillis() < adminTokenExpiresAtMs) {
+            return cached;
+        }
+        return refreshAdminToken();
+    }
+
+    private synchronized String refreshAdminToken() {
+        // Double-check under lock: another thread may have refreshed while we waited.
+        if (cachedAdminToken != null && System.currentTimeMillis() < adminTokenExpiresAtMs) {
+            return cachedAdminToken;
+        }
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("grant_type", "client_credentials");
         form.add("client_id", adminClientId);
@@ -260,7 +284,15 @@ public class KeycloakWebClient implements KeycloakAdminClient {
                 .timeout(TIMEOUT)
                 .block();
         cachedAdminToken = body == null ? null : asString(body.get("access_token"));
+        long expiresIn = body == null ? 0 : asLong(body.get("expires_in"));
+        // Renew at ~80% of lifetime; floor the lifetime so a missing/short expires_in still caches briefly.
+        adminTokenExpiresAtMs = System.currentTimeMillis() + (long) (Math.max(expiresIn, 30) * 1000L * 0.8);
         return cachedAdminToken;
+    }
+
+    private synchronized void invalidateAdminToken() {
+        cachedAdminToken = null;
+        adminTokenExpiresAtMs = 0L;
     }
 
     private static String firstName(String fullName) {
