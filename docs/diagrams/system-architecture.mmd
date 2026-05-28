@@ -1,0 +1,143 @@
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor':'#f6f8fa',
+  'primaryBorderColor':'#57606a',
+  'primaryTextColor':'#1f2328',
+  'lineColor':'#57606a',
+  'fontSize':'13px'
+}}}%%
+flowchart TB
+
+  classDef client    fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+  classDef edge      fill:#fde68a,stroke:#b45309,color:#7c2d12
+  classDef app       fill:#dcfce7,stroke:#15803d,color:#14532d
+  classDef data      fill:#fee2e2,stroke:#b91c1c,color:#7f1d1d
+  classDef bus       fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
+  classDef async     fill:#e5e7eb,stroke:#374151,color:#111827
+  classDef platform  fill:#f1f5f9,stroke:#475569,color:#0f172a
+  classDef obs       fill:#fef3c7,stroke:#a16207,color:#713f12
+
+  %% --- Clients ---
+  subgraph CLIENTS["Clients"]
+    direction LR
+    WEB["Web app"]:::client
+    MOB["Mobile app"]:::client
+    ADM["Admin / ops console"]:::client
+  end
+
+  %% --- Edge ---
+  subgraph EDGE["Edge"]
+    direction TB
+    GW["API Gateway<br/>(Spring Cloud Gateway)<br/>• TLS termination<br/>• JWT validation<br/>• Rate limiting<br/>• Circuit breaking<br/>• Routing"]:::edge
+  end
+
+  %% --- Core services (real, built for this submission) ---
+  subgraph CORE["Core services — implemented"]
+    direction TB
+    AUTH["Auth Service<br/>(Spring Boot)<br/>thin Keycloak adapter"]:::app
+    ACC["Account Service<br/>(Spring Boot)"]:::app
+    TX["Transaction Service<br/>(Spring Boot)<br/>• /transfer endpoint<br/>• Double-entry write<br/>• Outbox polling publisher"]:::app
+  end
+
+  %% --- Async consumers (documented only) ---
+  subgraph ASYNC["Async consumers — documented"]
+    direction TB
+    NOTIF["Notification Service<br/>(documented)"]:::async
+    FRAUD["Fraud Detection<br/>(documented)"]:::async
+    ACCJ["Accounting projector<br/>(documented)"]:::async
+  end
+
+  %% --- Data ---
+  subgraph DATA["Data tier"]
+    direction TB
+    MONGO[("MongoDB Replica Set<br/>users • accounts • transactions<br/>journal (append-only) • outbox")]:::data
+  end
+
+  %% --- Event bus ---
+  subgraph KAFKA_GRP["Event bus"]
+    direction TB
+    KAFKA[/"Kafka (KRaft mode)<br/>topics:<br/>transactions.transfer.completed<br/>transactions.transfer.failed<br/>transactions.transfer.reversed<br/>+ .retry / .DLT"/]:::bus
+    SR["Schema Registry<br/>(Apicurio)"]:::bus
+  end
+
+  %% --- Platform & identity ---
+  subgraph PLAT["Platform & identity"]
+    direction TB
+    KC["Keycloak<br/>OAuth2 / OIDC<br/>realm: fintech"]:::platform
+    CFG["Spring Cloud Config<br/>(centralised config)"]:::platform
+    DISC["Service registry<br/>(Consul / Eureka)"]:::platform
+    VAULT["Vault<br/>(secrets)"]:::platform
+  end
+
+  %% --- Observability ---
+  subgraph OBS["Observability"]
+    direction TB
+    PROM["Prometheus"]:::obs
+    GRAF["Grafana"]:::obs
+    LOKI["Loki"]:::obs
+    OTEL["OpenTelemetry Collector"]:::obs
+  end
+
+  %% --- Edges: clients to gateway
+  WEB -->|HTTPS / JWT| GW
+  MOB -->|HTTPS / JWT| GW
+  ADM -->|HTTPS / JWT| GW
+
+  %% --- Gateway → services
+  GW --> AUTH
+  GW --> ACC
+  GW --> TX
+
+  %% --- Auth uses Keycloak as IdP
+  AUTH <-->|OIDC| KC
+  GW   -.->|"JWKS<br/>(token validation)"| KC
+
+  %% --- Services → Mongo
+  AUTH -.->|reads/writes user profile| MONGO
+  ACC --> MONGO
+  TX  --> MONGO
+
+  %% --- Outbox → Kafka (TX is the producer)
+  TX  -->|"polling publisher<br/>(outbox tail)"| KAFKA
+  KAFKA <-.->|schemas| SR
+
+  %% --- Kafka → consumers
+  KAFKA --> NOTIF
+  KAFKA --> FRAUD
+  KAFKA --> ACCJ
+
+  %% --- Platform side-channels
+  AUTH -. config .- CFG
+  ACC  -. config .- CFG
+  TX   -. config .- CFG
+  GW   -. config .- CFG
+
+  AUTH -. discovery .- DISC
+  ACC  -. discovery .- DISC
+  TX   -. discovery .- DISC
+
+  TX   -. secrets .- VAULT
+  ACC  -. secrets .- VAULT
+  AUTH -. secrets .- VAULT
+
+  %% --- Observability scrape / push
+  AUTH -. metrics .-> PROM
+  ACC  -. metrics .-> PROM
+  TX   -. metrics .-> PROM
+  GW   -. metrics .-> PROM
+  KC   -. metrics .-> PROM
+  KAFKA -. metrics .-> PROM
+  MONGO -. metrics .-> PROM
+
+  AUTH -. logs .-> LOKI
+  ACC  -. logs .-> LOKI
+  TX   -. logs .-> LOKI
+  GW   -. logs .-> LOKI
+
+  AUTH -. traces .-> OTEL
+  ACC  -. traces .-> OTEL
+  TX   -. traces .-> OTEL
+  GW   -. traces .-> OTEL
+
+  PROM --> GRAF
+  LOKI --> GRAF
+  OTEL --> GRAF

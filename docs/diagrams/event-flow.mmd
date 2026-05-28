@@ -1,0 +1,114 @@
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor':'#f6f8fa',
+  'primaryBorderColor':'#57606a',
+  'primaryTextColor':'#1f2328',
+  'lineColor':'#57606a',
+  'fontSize':'13px'
+}}}%%
+flowchart LR
+
+  classDef tx       fill:#dcfce7,stroke:#15803d,color:#14532d
+  classDef data     fill:#fee2e2,stroke:#b91c1c,color:#7f1d1d
+  classDef pub      fill:#fde68a,stroke:#b45309,color:#7c2d12
+  classDef topic    fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
+  classDef consumer fill:#e0f2fe,stroke:#0369a1,color:#0c4a6e
+  classDef dlt      fill:#fecaca,stroke:#991b1b,color:#7f1d1d
+  classDef inbox    fill:#f3e8ff,stroke:#6b21a8,color:#3b0764
+  classDef side     fill:#e5e7eb,stroke:#374151,color:#111827
+
+  %% ─────────────────────────────────────────────
+  %% PRODUCER SIDE — Transaction Service
+  %% ─────────────────────────────────────────────
+  subgraph PROD["Producer side — Transaction Service"]
+    direction TB
+    TX["transfer()<br/>writes inside ONE Mongo transaction"]:::tx
+    subgraph MONGO_W["MongoDB (atomic write set)"]
+      direction TB
+      ACCDOC[("accounts<br/>debit src / credit dst")]:::data
+      JRNL[("journal<br/>2 lines (Dr/Cr)<br/>APPEND-ONLY")]:::data
+      TXDOC[("transactions<br/>unique idempotencyKey")]:::data
+      OUTBOX[("outbox<br/>status=PENDING<br/>eventId, payload")]:::data
+    end
+
+    PUB["Outbox publisher<br/>@Scheduled, ~200ms tick<br/>(in-process)"]:::pub
+
+    TX --> ACCDOC
+    TX --> JRNL
+    TX --> TXDOC
+    TX --> OUTBOX
+    OUTBOX -. tail rows where<br/>status=PENDING .-> PUB
+    PUB -. mark<br/>SENT .-> OUTBOX
+  end
+
+  %% ─────────────────────────────────────────────
+  %% KAFKA
+  %% ─────────────────────────────────────────────
+  subgraph BUS["Apache Kafka — event bus"]
+    direction TB
+    COMPLETED[/"transactions.transfer.completed<br/>retention: infinite<br/>partition key: transactionId<br/>acks=all, idempotent producer"/]:::topic
+    RETRY[/"transactions.transfer.completed.retry<br/>delayed redelivery"/]:::topic
+    DLT[/"transactions.transfer.completed.DLT<br/>poison messages"/]:::dlt
+  end
+
+  PUB -->|send key=txId<br/>headers: traceparent, eventId| COMPLETED
+
+  %% ─────────────────────────────────────────────
+  %% CONSUMERS — each is its own consumer group
+  %% ─────────────────────────────────────────────
+  subgraph CONS["Consumers (each in its own consumer group)"]
+    direction TB
+
+    subgraph NOTIF_G["Notification Service (group: notif)"]
+      direction TB
+      NOTIF_C["Consumer"]:::consumer
+      NOTIF_IN[("inbox<br/>processed_events<br/>PK = eventId")]:::inbox
+      NOTIF_H["Handle: email / SMS / push<br/>(idempotent via provider key = eventId)"]:::consumer
+    end
+
+    subgraph FRAUD_G["Fraud Detection (group: fraud)"]
+      direction TB
+      FRAUD_C["Consumer"]:::consumer
+      FRAUD_IN[("inbox")]:::inbox
+      FRAUD_H["Score transaction<br/>may emit tx.flagged"]:::consumer
+    end
+
+    subgraph ACCJ_G["Accounting projector (group: acc-proj)"]
+      direction TB
+      ACCJ_C["Consumer"]:::consumer
+      ACCJ_IN[("inbox")]:::inbox
+      ACCJ_H["Build read models<br/>(daily balances, reports)"]:::consumer
+    end
+  end
+
+  COMPLETED --> NOTIF_C
+  COMPLETED --> FRAUD_C
+  COMPLETED --> ACCJ_C
+
+  NOTIF_C -->|"insert eventId<br/>DuplicateKey → ack and skip"| NOTIF_IN
+  NOTIF_IN --> NOTIF_H
+  NOTIF_H -. on success<br/>manual commit offset .-> COMPLETED
+
+  FRAUD_C -->|inbox dedupe| FRAUD_IN
+  FRAUD_IN --> FRAUD_H
+
+  ACCJ_C -->|inbox dedupe| ACCJ_IN
+  ACCJ_IN --> ACCJ_H
+
+  %% Retry & DLT paths (apply to every consumer; drawn once for clarity)
+  NOTIF_H -. transient failure<br/>republish with delay .-> RETRY
+  RETRY  -. delay consumer .-> NOTIF_C
+  NOTIF_H -. retries exhausted .-> DLT
+
+  %% ─────────────────────────────────────────────
+  %% OPS / SIDE CHANNELS
+  %% ─────────────────────────────────────────────
+  subgraph OPS["Operations"]
+    direction TB
+    METRICS["Prometheus<br/>• outbox_pending_count<br/>• kafka_consumer_lag<br/>• dlt depth<br/>• events.deduped"]:::side
+    ALERTS["Alerts → PagerDuty / Slack"]:::side
+  end
+
+  OUTBOX -. gauge .-> METRICS
+  COMPLETED -. consumer lag .-> METRICS
+  DLT -. depth .-> METRICS
+  METRICS --> ALERTS

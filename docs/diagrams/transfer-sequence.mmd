@@ -1,0 +1,89 @@
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor':'#f6f8fa',
+  'primaryBorderColor':'#57606a',
+  'primaryTextColor':'#1f2328',
+  'lineColor':'#57606a',
+  'fontSize':'12px',
+  'noteBkgColor':'#fef3c7',
+  'noteBorderColor':'#a16207',
+  'noteTextColor':'#713f12',
+  'actorBkg':'#dcfce7',
+  'actorBorder':'#15803d',
+  'actorTextColor':'#14532d'
+}}}%%
+sequenceDiagram
+    autonumber
+    actor C as Client
+    participant GW as API Gateway
+    participant KC as Keycloak<br/>(JWKS)
+    participant TX as Transaction<br/>Service
+    participant IDEMP as IdempotencyService<br/>(unique index)
+    participant MONGO as MongoDB<br/>(replica set)
+    participant OUT as Outbox<br/>Publisher
+    participant KAFKA as Kafka<br/>tx.completed
+
+    Note over C,GW: Headers required:<br/>Authorization: Bearer <jwt><br/>Idempotency-Key: <uuid>
+
+    C->>GW: POST /v1/transactions/transfer<br/>{src, dst, amount, currency}
+
+    rect rgba(254, 243, 199, 0.5)
+      Note over GW: Edge concerns
+      GW->>KC: validate JWT signature<br/>(JWKS, cached)
+      KC-->>GW: ok / scopes / sub
+      GW->>GW: rate-limit check<br/>scope check (transfer:write)
+    end
+
+    GW->>TX: forward request<br/>+ X-Correlation-Id
+
+    rect rgba(220, 252, 231, 0.5)
+      Note over TX,MONGO: Single MongoDB transaction<br/>all-or-nothing
+      TX->>IDEMP: lookup by (userId, "transfer", key)
+      IDEMP->>MONGO: find one in `transactions`
+      alt Existing — same payload (replay)
+        MONGO-->>IDEMP: original tx doc
+        IDEMP-->>TX: return original
+        TX-->>GW: 200 OK + original response
+        GW-->>C: 200 OK + original response
+        Note over C,TX: Idempotent replay — no DB writes
+      else Existing — different payload
+        TX-->>GW: 409 /problems/idempotency-key-conflict
+        GW-->>C: 409 Conflict
+      else No existing record
+        TX->>MONGO: BEGIN TRANSACTION
+
+        TX->>MONGO: conditional debit on source<br/>updateOne({_id:src, balance:{$gte:amt}, status:ACTIVE},<br/> {$inc:{balance:-amt}, $inc:{version:1}})
+
+        alt matchedCount == 0
+          MONGO-->>TX: no match
+          TX->>MONGO: ABORT
+          TX-->>GW: 422 /problems/insufficient-funds<br/>or /problems/account-unavailable
+          GW-->>C: 422 Unprocessable Entity
+        else matched
+          MONGO-->>TX: ok
+          TX->>MONGO: credit destination<br/>(updateOne with version check)
+          MONGO-->>TX: ok
+          TX->>MONGO: insert 2 journal lines<br/>(DEBIT on src, CREDIT on dst)
+          MONGO-->>TX: ok
+          TX->>MONGO: insert transactions doc<br/>(idempotencyKey, status=COMPLETED, journalLineIds)
+          MONGO-->>TX: ok (unique-index enforces idempotency)
+          TX->>MONGO: insert outbox row<br/>(topic=tx.completed, payload=event)
+          MONGO-->>TX: ok
+          TX->>MONGO: COMMIT
+          MONGO-->>TX: committed
+          TX-->>GW: 201 Created + TransferResponse
+          GW-->>C: 201 Created
+        end
+      end
+    end
+
+    Note over OUT,KAFKA: Asynchronous — does NOT block the response<br/>Polling worker, ~200ms tick
+
+    loop every ~200ms
+      OUT->>MONGO: find outbox where status=PENDING<br/>order by createdAt limit N
+      MONGO-->>OUT: batch
+      OUT->>KAFKA: send(topic, key=transactionId, value=event)
+      KAFKA-->>OUT: ack (acks=all)
+      OUT->>MONGO: mark outbox row SENT
+    end
+
+    Note over TX,OUT: If TX commits then publisher crashes:<br/>row stays PENDING → republished on next tick<br/>If Kafka acks then publisher crashes before mark SENT:<br/>row republished → duplicate in Kafka<br/>→ consumers dedupe by eventId (inbox pattern)
