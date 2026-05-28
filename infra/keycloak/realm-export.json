@@ -43,6 +43,42 @@
 
   "clientScopes": [
     {
+      "name": "roles",
+      "protocol": "openid-connect",
+      "description": "Standard role claims. Restores realm_access/resource_access role mappers, which the custom client-scope set above otherwise drops — required so the auth-service service account's realm-management roles reach its token.",
+      "attributes": { "include.in.token.scope": "false", "display.on.consent.screen": "false" },
+      "protocolMappers": [
+        {
+          "name": "realm roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "multivalued": "true",
+            "userinfo.token.claim": "false",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "claim.name": "realm_access.roles",
+            "jsonType.label": "String"
+          }
+        },
+        {
+          "name": "client roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-client-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "multivalued": "true",
+            "userinfo.token.claim": "false",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "claim.name": "resource_access.${client_id}.roles",
+            "jsonType.label": "String"
+          }
+        }
+      ]
+    },
+    {
       "name": "accounts:read",
       "protocol": "openid-connect",
       "description": "Read own accounts and balances"
@@ -119,7 +155,8 @@
       "standardFlowEnabled": false,
       "attributes": {
         "access.token.lifespan": "900"
-      }
+      },
+      "defaultClientScopes": ["roles", "accounts:read", "transactions:read"]
     },
     {
       "clientId": "gateway",
@@ -160,6 +197,14 @@
       "emailVerified": true,
       "credentials": [{ "type": "password", "value": "AuditorP@ss1!", "temporary": false }],
       "realmRoles": ["user", "auditor"]
+    },
+    {
+      "username": "service-account-auth-service",
+      "enabled": true,
+      "serviceAccountClientId": "auth-service",
+      "clientRoles": {
+        "realm-management": ["manage-users", "view-users"]
+      }
     }
   ]
 }

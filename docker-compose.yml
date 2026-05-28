@@ -189,21 +189,17 @@ services:
       dockerfile: services/auth-service/Dockerfile
     container_name: fintech-auth
     ports: ["9081:8081"]
-    # SPRING_APPLICATION_JSON is parsed by SpringApplicationJsonEnvironmentPostProcessor
-    # very early in startup, above env vars and yaml in the precedence chain. Necessary
-    # workaround because Spring Boot 4.0.6 isn't binding our application.yaml's
-    # ${MONGO_URI:default} placeholder nor the SPRING_DATA_MONGODB_URI relaxed-binding
-    # env var for reasons we haven't yet diagnosed.
+    # application.yaml reads these placeholder names directly
+    # (spring.data.mongodb.uri: ${MONGO_URI:...} etc.), so we set the placeholders
+    # rather than try to override the resolved properties from a higher-precedence
+    # source — the latter did not take effect under Spring Boot 4.0.6.
     environment:
-      SPRING_APPLICATION_JSON: |
-        {
-          "spring.data.mongodb.uri": "mongodb://fintech_writer:dev_writer_password@mongo1:27017,mongo2:27017,mongo3:27017/fintech?replicaSet=rs0&authSource=fintech",
-          "spring.kafka.bootstrap-servers": "kafka:9092",
-          "spring.security.oauth2.resourceserver.jwt.issuer-uri": "http://keycloak:8080/realms/fintech",
-          "management.server.port": 8081
-        }
+      MONGO_URI: "mongodb://fintech_writer:dev_writer_password@mongo1:27017,mongo2:27017,mongo3:27017/fintech?replicaSet=rs0&authSource=fintech"
+      KAFKA_BOOTSTRAP: kafka:9092
+      KEYCLOAK_ISSUER_URI: http://keycloak:8080/realms/fintech
       KEYCLOAK_BASE_URL: http://keycloak:8080
       KEYCLOAK_ADMIN_SECRET: dev-only-secret-not-for-prod
+      MANAGEMENT_PORT: "8081"
       SPRING_PROFILES_ACTIVE: compose
     depends_on:
       mongo-init: { condition: service_completed_successfully }
@@ -224,10 +220,10 @@ services:
     container_name: fintech-account
     ports: ["9082:8081"]
     environment:
-      SPRING_DATA_MONGODB_URI: "mongodb://fintech_writer:dev_writer_password@mongo1:27017,mongo2:27017,mongo3:27017/fintech?replicaSet=rs0&authSource=fintech"
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://keycloak:8080/realms/fintech
-      MANAGEMENT_SERVER_PORT: "8081"
+      MONGO_URI: "mongodb://fintech_writer:dev_writer_password@mongo1:27017,mongo2:27017,mongo3:27017/fintech?replicaSet=rs0&authSource=fintech"
+      KAFKA_BOOTSTRAP: kafka:9092
+      KEYCLOAK_ISSUER_URI: http://keycloak:8080/realms/fintech
+      MANAGEMENT_PORT: "8081"
       SPRING_PROFILES_ACTIVE: compose
     depends_on:
       mongo-init: { condition: service_completed_successfully }
@@ -248,10 +244,10 @@ services:
     container_name: fintech-transaction
     ports: ["9083:8081"]
     environment:
-      SPRING_DATA_MONGODB_URI: "mongodb://fintech_journal_writer:dev_journal_password@mongo1:27017,mongo2:27017,mongo3:27017/fintech?replicaSet=rs0&authSource=fintech"
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://keycloak:8080/realms/fintech
-      MANAGEMENT_SERVER_PORT: "8081"
+      MONGO_URI: "mongodb://fintech_journal_writer:dev_journal_password@mongo1:27017,mongo2:27017,mongo3:27017/fintech?replicaSet=rs0&authSource=fintech"
+      KAFKA_BOOTSTRAP: kafka:9092
+      KEYCLOAK_ISSUER_URI: http://keycloak:8080/realms/fintech
+      MANAGEMENT_PORT: "8081"
       SPRING_PROFILES_ACTIVE: compose
     depends_on:
       mongo-init: { condition: service_completed_successfully }
@@ -274,10 +270,10 @@ services:
     environment:
       # Accounting owns its own database — `fintech_accounting`. No connection to `fintech`.
       # Read-model is materialised from Kafka events by TransactionEventsProjector.
-      SPRING_DATA_MONGODB_URI: "mongodb://accounting_writer:dev_accounting_password@mongo1:27017,mongo2:27017,mongo3:27017/fintech_accounting?replicaSet=rs0&authSource=fintech_accounting"
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://keycloak:8080/realms/fintech
-      MANAGEMENT_SERVER_PORT: "8081"
+      MONGO_URI: "mongodb://accounting_writer:dev_accounting_password@mongo1:27017,mongo2:27017,mongo3:27017/fintech_accounting?replicaSet=rs0&authSource=fintech_accounting"
+      KAFKA_BOOTSTRAP: kafka:9092
+      KEYCLOAK_ISSUER_URI: http://keycloak:8080/realms/fintech
+      MANAGEMENT_PORT: "8081"
       SPRING_PROFILES_ACTIVE: compose
     depends_on:
       mongo-init: { condition: service_completed_successfully }
