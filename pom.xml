@@ -46,6 +46,21 @@
             -41284, -42498, -43513 (HIGH), all fixed in 11.0.22.
         -->
         <tomcat.version>11.0.22</tomcat.version>
+        <!--
+            Override the Netty version managed by Spring Boot 4.0.6 (4.2.12.Final).
+            Required to close CVE-2026-42583, -42579, -42584, -42587, -42582, -42577
+            (HIGH) across netty-codec-*, netty-transport-native-epoll, all fixed in
+            4.2.13.Final. Pulled transitively via reactor-netty / spring-cloud-gateway.
+        -->
+        <netty.version>4.2.13.Final</netty.version>
+        <!--
+            BouncyCastle is not managed by the Spring Boot or Spring Cloud BOMs; it
+            arrives transitively as bcprov-jdk18on:1.81 via spring-cloud-starter ->
+            spring-cloud-commons. Pinned here (see dependencyManagement below) to close
+            CVE-2026-5598 (HIGH, private-key leakage via non-constant-time comparison),
+            fixed in 1.84.
+        -->
+        <bouncycastle.version>1.84</bouncycastle.version>
     </properties>
 
     <dependencyManagement>
@@ -63,6 +78,15 @@
                 <version>${testcontainers.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+            <!--
+                Force the unmanaged transitive bcprov-jdk18on (1.81 via spring-cloud-commons)
+                up to 1.84 to close CVE-2026-5598 (HIGH). See bouncycastle.version above.
+            -->
+            <dependency>
+                <groupId>org.bouncycastle</groupId>
+                <artifactId>bcprov-jdk18on</artifactId>
+                <version>${bouncycastle.version}</version>
             </dependency>
             <!--
                 Mongock removed: no Spring Boot 4 / Spring Framework 7 compatible artifact at
