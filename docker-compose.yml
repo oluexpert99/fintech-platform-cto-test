@@ -309,3 +309,25 @@ services:
       interval: 10s
       timeout: 5s
       retries: 6
+
+  # One-shot seeding of demo users with distinct realm roles (user / operator / auditor) so the
+  # UI's role-based views can be exercised. Registers them through the public API (creating them
+  # in both Keycloak and Mongo) then assigns realm roles. Idempotent; exits 0 when done.
+  seed-users:
+    image: alpine:3.20
+    container_name: fintech-seed-users
+    depends_on:
+      gateway:      { condition: service_healthy }
+      auth-service: { condition: service_healthy }
+      keycloak:     { condition: service_healthy }
+    environment:
+      BASE_URL: http://gateway:8080
+      KC_URL: http://keycloak:8080
+      ADMIN_USER: admin
+      ADMIN_PASSWORD: admin
+      SEED_PASSWORD: DemoP@ssw0rd1!
+    volumes:
+      - ./scripts/seed-users.sh:/seed/seed-users.sh:ro
+    networks: [fintech-net]
+    restart: "no"
+    entrypoint: ["sh", "-c", "apk add --no-cache curl jq >/dev/null && sh /seed/seed-users.sh"]

@@ -176,6 +176,22 @@ docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d
 docker compose down -v
 ```
 
+### Demo users (role-based UI)
+
+On boot, the `seed-users` one-shot creates three sign-in accounts with different realm roles so
+the UI's role-based views can be exercised (it registers them through the API and assigns roles —
+re-runnable via `./scripts/seed-users.sh`). All use password `DemoP@ssw0rd1!`:
+
+| Email | Role | Sees in the UI |
+|---|---|---|
+| `demo@fintech.local` | user | Accounts, Transactions (Accounting is locked 🔒) |
+| `operator@fintech.local` | operator | + Accounting: journal entries, chart of accounts |
+| `auditor@fintech.local` | auditor | + Accounting: reports / trial balance |
+
+> The realm-export users (`alice`, `operator1`, `auditor1`) exist only in Keycloak and **cannot**
+> sign in to the app — app login also requires the user in the app's own store, which only the
+> register flow (and hence `seed-users`) creates.
+
 Then the cURL flow in [Appendix B of `api.md`](docs/api.md#appendix-b--curl-examples) walks through:
 
 1. Register a user
