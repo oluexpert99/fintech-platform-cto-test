@@ -6,6 +6,7 @@ import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -29,14 +30,18 @@ public class RedisRateLimitClient {
 
     public Mono<RateLimitDecision> tryConsume(String bucket, RateLimitProperties.Bucket cfg) {
         long now = System.currentTimeMillis();
-        return redis.execute(
-                        script,
-                        List.of(bucket),
-                        List.of(
-                                Long.toString(now),
-                                Integer.toString(cfg.getCapacity()),
-                                Double.toString(cfg.getRefillPerSecond()),
-                                "1"))
+        // NOTE: keys/args must be MUTABLE lists. Spring Data Redis's reactive script executor
+        // mutates the args list on the EVALSHA path (NOSCRIPT fallback / arg assembly); an
+        // immutable List.of(...) makes it throw UnsupportedOperationException. That surfaced only
+        // after the response had already committed, which closed the connection mid-response and
+        // truncated chunked downstream bodies (curl: "transfer closed with outstanding read data").
+        List<String> keys = new ArrayList<>(List.of(bucket));
+        List<String> args = new ArrayList<>(List.of(
+                Long.toString(now),
+                Integer.toString(cfg.getCapacity()),
+                Double.toString(cfg.getRefillPerSecond()),
+                "1"));
+        return redis.execute(script, keys, args)
                 .next()
                 .map(raw -> toDecision(raw, cfg, bucket));
     }

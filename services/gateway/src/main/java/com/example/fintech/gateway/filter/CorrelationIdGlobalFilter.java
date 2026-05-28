@@ -33,7 +33,15 @@ public class CorrelationIdGlobalFilter implements GlobalFilter, Ordered {
                 .headers(h -> h.set(HEADER, correlationId))
                 .build();
 
-        exchange.getResponse().getHeaders().set(HEADER, correlationId);
+        // Echo the correlation id on the response via beforeCommit. By the time this global
+        // filter runs for a proxied route the response headers are read-only, so a direct
+        // set(...) throws UnsupportedOperationException — which, surfacing after the response is
+        // committed, closed the connection and truncated chunked downstream bodies. beforeCommit
+        // runs while the headers are still mutable, and is simply skipped if already committed.
+        exchange.getResponse().beforeCommit(() -> {
+            exchange.getResponse().getHeaders().set(HEADER, correlationId);
+            return Mono.empty();
+        });
 
         MDC.put("correlationId", correlationId);
         return chain.filter(exchange.mutate().request(mutated).build())
