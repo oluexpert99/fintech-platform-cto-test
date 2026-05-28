@@ -157,20 +157,20 @@ Every Part of the brief maps to a specific section of [`docs/ARCHITECTURE.md`](d
 ## Running locally
 
 ```bash
-# 1. Boot the platform (≤ 90s on 4-core / 8 GB)
+# 1. Boot the platform — gateway, services, and the UI (≤ 90s on 4-core / 8 GB)
 docker compose up -d
 
 # 2. Wait for the gateway to be ready
 until curl -fs http://localhost:8080/actuator/health > /dev/null; do sleep 2; done
 
-# 3. End-to-end demo: register → login → open accounts → transfer → replay → refresh → logout
+# 3. Open the platform UI on http://localhost:5173
+open http://localhost:5173
+
+# 4. End-to-end demo: register → login → open accounts → transfer → replay → refresh → logout
 ./scripts/demo-happy-path.sh
 
-# 4. (Optional) Observability overlay — Grafana on http://localhost:3000  (admin/admin)
+# 5. (Optional) Observability overlay — Grafana on http://localhost:3000  (admin/admin)
 docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d
-
-# 5. (Optional) Platform UI profile — UI on http://localhost:5173
-docker compose --profile ui up -d
 
 # 6. Reset
 docker compose down -v

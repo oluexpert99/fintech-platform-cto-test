@@ -189,13 +189,21 @@ services:
       dockerfile: services/auth-service/Dockerfile
     container_name: fintech-auth
     ports: ["9081:8081"]
+    # SPRING_APPLICATION_JSON is parsed by SpringApplicationJsonEnvironmentPostProcessor
+    # very early in startup, above env vars and yaml in the precedence chain. Necessary
+    # workaround because Spring Boot 4.0.6 isn't binding our application.yaml's
+    # ${MONGO_URI:default} placeholder nor the SPRING_DATA_MONGODB_URI relaxed-binding
+    # env var for reasons we haven't yet diagnosed.
     environment:
-      MONGO_URI: "mongodb://fintech_writer:dev_writer_password@mongo1:27017,mongo2:27017,mongo3:27017/fintech?replicaSet=rs0&authSource=fintech"
-      KAFKA_BOOTSTRAP: kafka:9092
-      KEYCLOAK_ISSUER_URI: http://keycloak:8080/realms/fintech
+      SPRING_APPLICATION_JSON: |
+        {
+          "spring.data.mongodb.uri": "mongodb://fintech_writer:dev_writer_password@mongo1:27017,mongo2:27017,mongo3:27017/fintech?replicaSet=rs0&authSource=fintech",
+          "spring.kafka.bootstrap-servers": "kafka:9092",
+          "spring.security.oauth2.resourceserver.jwt.issuer-uri": "http://keycloak:8080/realms/fintech",
+          "management.server.port": 8081
+        }
       KEYCLOAK_BASE_URL: http://keycloak:8080
       KEYCLOAK_ADMIN_SECRET: dev-only-secret-not-for-prod
-      MANAGEMENT_PORT: "8081"
       SPRING_PROFILES_ACTIVE: compose
     depends_on:
       mongo-init: { condition: service_completed_successfully }
@@ -216,10 +224,10 @@ services:
     container_name: fintech-account
     ports: ["9082:8081"]
     environment:
-      MONGO_URI: "mongodb://fintech_writer:dev_writer_password@mongo1:27017,mongo2:27017,mongo3:27017/fintech?replicaSet=rs0&authSource=fintech"
-      KAFKA_BOOTSTRAP: kafka:9092
-      KEYCLOAK_ISSUER_URI: http://keycloak:8080/realms/fintech
-      MANAGEMENT_PORT: "8081"
+      SPRING_DATA_MONGODB_URI: "mongodb://fintech_writer:dev_writer_password@mongo1:27017,mongo2:27017,mongo3:27017/fintech?replicaSet=rs0&authSource=fintech"
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://keycloak:8080/realms/fintech
+      MANAGEMENT_SERVER_PORT: "8081"
       SPRING_PROFILES_ACTIVE: compose
     depends_on:
       mongo-init: { condition: service_completed_successfully }
@@ -240,10 +248,10 @@ services:
     container_name: fintech-transaction
     ports: ["9083:8081"]
     environment:
-      MONGO_URI: "mongodb://fintech_journal_writer:dev_journal_password@mongo1:27017,mongo2:27017,mongo3:27017/fintech?replicaSet=rs0&authSource=fintech"
-      KAFKA_BOOTSTRAP: kafka:9092
-      KEYCLOAK_ISSUER_URI: http://keycloak:8080/realms/fintech
-      MANAGEMENT_PORT: "8081"
+      SPRING_DATA_MONGODB_URI: "mongodb://fintech_journal_writer:dev_journal_password@mongo1:27017,mongo2:27017,mongo3:27017/fintech?replicaSet=rs0&authSource=fintech"
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://keycloak:8080/realms/fintech
+      MANAGEMENT_SERVER_PORT: "8081"
       SPRING_PROFILES_ACTIVE: compose
     depends_on:
       mongo-init: { condition: service_completed_successfully }
@@ -266,10 +274,10 @@ services:
     environment:
       # Accounting owns its own database — `fintech_accounting`. No connection to `fintech`.
       # Read-model is materialised from Kafka events by TransactionEventsProjector.
-      MONGO_URI: "mongodb://accounting_writer:dev_accounting_password@mongo1:27017,mongo2:27017,mongo3:27017/fintech_accounting?replicaSet=rs0&authSource=fintech_accounting"
-      KAFKA_BOOTSTRAP: kafka:9092
-      KEYCLOAK_ISSUER_URI: http://keycloak:8080/realms/fintech
-      MANAGEMENT_PORT: "8081"
+      SPRING_DATA_MONGODB_URI: "mongodb://accounting_writer:dev_accounting_password@mongo1:27017,mongo2:27017,mongo3:27017/fintech_accounting?replicaSet=rs0&authSource=fintech_accounting"
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://keycloak:8080/realms/fintech
+      MANAGEMENT_SERVER_PORT: "8081"
       SPRING_PROFILES_ACTIVE: compose
     depends_on:
       mongo-init: { condition: service_completed_successfully }
@@ -287,12 +295,18 @@ services:
     build:
       context: .
       dockerfile: services/platform-ui/Dockerfile
+      args:
+        # Baked into the bundle at build time (Vite import.meta.env). The browser
+        # runs on the host, so the gateway is reachable at localhost:8080.
+        VITE_API_BASE_URL: http://localhost:8080
     container_name: fintech-platform-ui
-    profiles: ["ui"]
-    ports: ["5173:5173"]
-    environment:
-      VITE_API_BASE_URL: http://localhost:8080
+    ports: ["5173:80"]
     depends_on:
       gateway: { condition: service_healthy }
     networks: [fintech-net]
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:80/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6

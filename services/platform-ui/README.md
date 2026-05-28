@@ -42,15 +42,25 @@ Set an alternate gateway with:
 VITE_API_BASE_URL=http://localhost:8080 npm run dev
 ```
 
-## Docker compose profile
+## Docker compose
 
-`platform-ui` runs under the optional `ui` profile:
+`platform-ui` starts with the rest of the stack on `docker compose up -d`. The
+container is a multi-stage build: Vite compiles a static bundle which nginx then
+serves (SPA fallback to `index.html` for client-side routing).
 
 ```bash
-docker compose --profile ui up -d
+docker compose up -d
 ```
 
 UI: `http://localhost:5173`
+
+`VITE_API_BASE_URL` is inlined at **build time** (it defaults to
+`http://localhost:8080`). To point the built image at a different gateway,
+override the build arg:
+
+```bash
+docker compose build --build-arg VITE_API_BASE_URL=http://localhost:8080 platform-ui
+```
 
 ## Basic usage flow
 
