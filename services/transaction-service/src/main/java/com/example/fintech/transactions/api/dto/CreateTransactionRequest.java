@@ -25,10 +25,13 @@ public record CreateTransactionRequest(
         TransactionType type,
 
         // ----- TRANSFER fields -----
-        @Pattern(regexp = "^ACC[0-9]{6,}$", message = "INVALID_FORMAT")
+        // "ACC" + uppercase Crockford base32 ULID, as emitted by account-service (e.g.
+        // ACC01KSRC66KQE3TQ26RDTHETCQD6). The previous digits-only ^ACC[0-9]{6,}$ rejected
+        // every real account id. Lenient on length (>=6) since we only validate inbound refs.
+        @Pattern(regexp = "^ACC[A-Z0-9]{6,}$", message = "INVALID_FORMAT")
         String sourceAccount,
 
-        @Pattern(regexp = "^ACC[0-9]{6,}$", message = "INVALID_FORMAT")
+        @Pattern(regexp = "^ACC[A-Z0-9]{6,}$", message = "INVALID_FORMAT")
         String destinationAccount,
 
         @Positive(message = "MUST_BE_POSITIVE")
